@@ -1,0 +1,41 @@
+version: '3.0'
+
+services:
+
+  test-timescale-memory:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        UID: ${UID}
+        USER: ${USER}
+    volumes:
+      - ./src/test-timescale-memory/:/go/src/test-timescale-memory/
+    depends_on:
+      - timescale
+      - postgres
+
+  timescale:
+    image: timescale/timescaledb:latest-pg10
+    environment:
+      POSTGRES_DB: timescale
+      POSTGRES_PASSWORD: qwerty
+    ports:
+      - "6666:5432"
+    stop_signal: SIGKILL
+    command: postgres -c config_file=/etc/postgresql.conf
+    volumes:
+       - ./config/timescale.conf:/etc/postgresql.conf
+
+  postgres:
+    image: postgres:10-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: qwerty
+    ports:
+      - "6667:5432"
+    stop_signal: SIGKILL
+    command: postgres -c config_file=/etc/postgresql.conf
+    volumes:
+           - ./config/postgres.conf:/etc/postgresql.conf
+

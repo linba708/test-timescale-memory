@@ -1,0 +1,6 @@
+FROM golang:1.8
+
+RUN mkdir -p /go/src/test-timescale-memory
+WORKDIR /go/src/test-timescale-memory
+
+CMD go run /go/src/test-timescale-memory/cmd/memory-test.go
