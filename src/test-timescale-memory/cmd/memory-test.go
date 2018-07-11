@@ -5,6 +5,7 @@ import (
 	_ "github.com/lib/pq"
 	"time"
 	"database/sql"
+	"strings"
 )
 
 
@@ -15,12 +16,12 @@ func setup(db *sql.DB){
 	db.Exec(`CREATE EXTENSION IF NOT EXISTS  timescaledb  CASCADE;`)
 
 
-	_, err := db.Exec(`DROP TABLE IF EXISTS trades;`)
-	if err != nil {
-		panic(err)
-	}
+	//_, err := db.Exec(`DROP TABLE IF EXISTS trades;`)
+	//if err != nil {
+	//	panic(err)
+	//}
 
-	_, err = db.Exec(`
+	_, err := db.Exec(`
 CREATE TABLE IF NOT EXISTS trades
 (
   insref numeric(20) NOT NULL,
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS trades
 	}
 
 	//will only create hypertable in
-	db.Exec("SELECT create_hypertable('trades', 'date', chunk_time_interval => interval '1 day');")
+	//db.Exec("SELECT create_hypertable('trades', 'date', chunk_time_interval => interval '1 day');")
 
 }
 
@@ -63,10 +64,11 @@ func main() {
 
 	pgTest := func(prog chan int, done chan bool, uri string ) {
 
-		days := 5
+		days := 55
 		perDay := 500000
+		batchSize := 10000
 		startDate := time.Now()
-
+		//startDate.Add(time.Hour * 24 * time.Duration(56))
 
 		db, err := sql.Open("postgres", uri)
 		setup(db)
@@ -79,8 +81,25 @@ func main() {
 		for day := 1; day <= days ; day++  {
 			currentDate := startDate.Add(time.Hour * 24 * time.Duration(day))
 			dateAsString := currentDate.Format("2006-01-02")
-			for insref := 1; insref <= perDay; insref++ {
-				_, err := db.Exec(fmt.Sprintf("INSERT INTO trades(insref, date, tradereference, tradecode, time) VALUES (%d, '%s', 'FA12347', 224, '00:00:00');", insref, dateAsString))
+			for insref := 0; insref < perDay; insref += batchSize {
+				query := make([]string, 0, batchSize)
+				insertString :=
+					`INSERT INTO trades
+					(insref,
+					date,
+					tradereference,
+					tradecode,
+					time)
+					VALUES `
+				for j := insref; j < perDay && j < insref + batchSize; j ++ {
+					value := fmt.Sprintf("(%d, '%s', 'FA12347', 224, '00:00:00')", j, dateAsString)
+					query = append(query, value)
+				}
+				q := insertString + strings.Join(query, ",") + ";"
+				//fmt.Printf(q)
+
+
+				_, err := db.Exec(q)
 				if err != nil {
 					fmt.Println("Error handling query",err)
 				}
@@ -99,7 +118,7 @@ func main() {
 
 
 	go pgTest(timescale, timescaleDone, "postgresql://postgres:qwerty@timescale:5432/timescale?sslmode=disable")
-	go pgTest(pg, pgDone, "postgresql://postgres:qwerty@postgres:5432/postgres?sslmode=disable")
+	//go pgTest(pg, pgDone, "postgresql://postgres:qwerty@postgres:5432/postgres?sslmode=disable")
 
 
 
